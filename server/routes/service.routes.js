@@ -34,5 +34,19 @@ router.delete('/:id', verifyToken, async (req, res) => {
   }
 });
 
+// PUT update service (SECURED)
+router.put('/:id', verifyToken, async (req, res) => {
+  try {
+    const updatedService = await Service.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { new: true }
+    );
+    res.json(updatedService);
+  } catch (err) { 
+    res.status(500).json({ error: 'Failed to update service' }); 
+  }
+});
+
 // CRITICAL: This is what tells Express the routes actually exist!
 module.exports = router;

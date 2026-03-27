@@ -12,14 +12,17 @@ const App = () => {
   const {
     time, services, stats, wiki, rss, weather, logs,
     token, currentUser, setupRequired, handleLogin, handleSetup, handleLogout,
-    addLog, syncAllData, submitNewService, removeService
+    addLog, syncAllData, submitNewService, removeService, updateService
   } = useGnosysData();
 
   const [view, setView] = useState('dashboard');
   const [isManageOpen, setIsManageOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Edit State
   const [newService, setNewService] = useState({ name: '', tag: '', url: '', description: '' });
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
@@ -33,21 +36,34 @@ const App = () => {
     }
   };
 
-  const handleAddService = async (e) => {
+  const handleAddOrUpdateService = async (e) => {
     e.preventDefault();
-    const success = await submitNewService(newService);
-    if (success) setNewService({ name: '', tag: '', url: '', description: '' });
+    const success = editingId 
+      ? await updateService(editingId, newService)
+      : await submitNewService(newService);
+      
+    if (success) {
+      setNewService({ name: '', tag: '', url: '', description: '' });
+      setEditingId(null);
+    }
+  };
+
+  const triggerEdit = (service) => {
+    setNewService({ name: service.name, tag: service.tag, url: service.url, description: service.description });
+    setEditingId(service._id);
+  };
+
+  const cancelEdit = () => {
+    setNewService({ name: '', tag: '', url: '', description: '' });
+    setEditingId(null);
   };
 
   const toggleManageServices = () => {
     if (isManageOpen) {
       setIsManageOpen(false);
+      cancelEdit();
     } else {
-      if (token) {
-        setIsManageOpen(true); // Open if already logged in
-      } else {
-        setShowAuthModal(true); // Prompt login if not
-      }
+      token ? setIsManageOpen(true) : setShowAuthModal(true);
     }
   };
 
@@ -86,8 +102,6 @@ const App = () => {
           )}
         </nav>
 
-        {/* --- FIX IS HERE: EXPLICIT CONDITIONAL RENDERING FOR EACH VIEW --- */}
-        
         {view === 'dashboard' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
             <TopBar
@@ -99,12 +113,14 @@ const App = () => {
 
             {isManageOpen && (
               <ServiceManager
-                services={services} newService={newService}
-                setNewService={setNewService} addService={handleAddService} removeService={removeService}
+                services={services} newService={newService} setNewService={setNewService}
+                handleAddOrUpdate={handleAddOrUpdateService} removeService={removeService}
+                editingId={editingId} triggerEdit={triggerEdit} cancelEdit={cancelEdit}
               />
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* items-start here prevents the whole grid from stretching to the sidebar's height */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
               <ServiceGrid services={services} />
               <Sidebar logs={logs} wiki={wiki} stats={stats} rss={rss} />
             </div>
@@ -118,8 +134,6 @@ const App = () => {
         {view === 'settings' && (
           <SettingsPanel token={token} addLog={addLog} />
         )}
-
-        {/* ---------------------------------------------------------------- */}
 
         <footer className="mt-24 border-t border-[#262626] pt-10 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.3em] text-gray-700 font-bold gap-4">
           <div className="flex gap-8"><span>© 2026 Gnosys Labs Gateway</span><span className="hidden md:inline">//</span><span>Plant City NOC</span></div>

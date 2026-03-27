@@ -150,6 +150,30 @@ export function useGnosysData() {
     }
   };
 
+  const updateService = async (id, serviceData) => {
+    try {
+      const res = await fetch(`${API_BASE}/services/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(serviceData)
+      });
+      if (res.ok) {
+        addLog(`Asset Updated: ${serviceData.name.toUpperCase()}`);
+        fetchServices();
+        return true; 
+      } else {
+        if (res.status === 401 || res.status === 403) handleLogout();
+        addLog("Write Error: Access Denied.");
+      }
+    } catch (err) { 
+      addLog("Write Error: Transaction failed."); 
+      return false;
+    }
+  };
+
   const removeService = async (id, name) => {
     try {
       const res = await fetch(`${API_BASE}/services/${id}`, { 
@@ -172,11 +196,13 @@ export function useGnosysData() {
     syncAllData();
     const statsInterval = setInterval(fetchStats, 5000); 
     const rssInterval = setInterval(fetchRSS, 600000); 
+    const servicesInterval = setInterval(fetchServices, 15000);
     
     return () => {
       clearInterval(timer);
       clearInterval(statsInterval);
       clearInterval(rssInterval);
+      clearInterval(servicesInterval);
     };
   }, []);
 
@@ -184,6 +210,6 @@ export function useGnosysData() {
     time, services, stats, wiki, rss, weather, logs,
     token, currentUser, setupRequired,
     handleLogin, handleSetup, handleLogout,
-    addLog, syncAllData, submitNewService, removeService
+    addLog, syncAllData, submitNewService, removeService, updateService
   };
 }

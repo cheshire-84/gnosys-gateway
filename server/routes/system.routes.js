@@ -63,7 +63,10 @@ router.get('/rss', async (req, res) => {
 // Proxy Wikipedia Random Article
 router.get('/wiki', async (req, res) => {
   try {
-    const response = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary');
+    // Wikipedia requires a custom User-Agent to prevent bot-blocking
+    const response = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary', {
+      headers: { 'User-Agent': 'GnosysLabsGateway/1.0 (cheshire.84@icloud.com)' }
+    });
     if (!response.ok) throw new Error('Wiki API offline');
     const data = await response.json();
     res.json(data);

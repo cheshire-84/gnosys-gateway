@@ -5,7 +5,9 @@ const serviceSchema = new mongoose.Schema({
   tag: { type: String, required: true },
   url: { type: String, required: true },
   description: String,
-  status: { type: String, default: 'OPERATIONAL' },
+  status: { type: String, default: 'UNKNOWN' },
+  lastChecked: { type: Date, default: null },
+  pingHistory: { type: [Number], default: [] }, // <-- NEW SPARKLINE MEMORY
   createdAt: { type: Date, default: Date.now }
 });
 

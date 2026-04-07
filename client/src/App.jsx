@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGnosysData } from './hooks/useGnosysData';
 import TopBar from './components/TopBar';
 import ServiceManager from './components/ServiceManager';
@@ -10,7 +10,7 @@ import SettingsPanel from './components/SettingsPanel';
 
 const App = () => {
   const {
-    time, services, stats, wiki, rss, weather, logs,
+    time, services, stats, weather, logs,
     token, currentUser, setupRequired, handleLogin, handleSetup, handleLogout,
     addLog, syncAllData, submitNewService, removeService, updateService
   } = useGnosysData();
@@ -20,9 +20,38 @@ const App = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Edit State
   const [newService, setNewService] = useState({ name: '', tag: '', url: '', description: '' });
   const [editingId, setEditingId] = useState(null);
+
+  // --- AUTO-LOCK LOGIC (15 MINUTE TIMEOUT) ---
+  const timeoutRef = useRef(null);
+  const INACTIVITY_LIMIT = 15 * 60 * 1000; 
+
+  const resetIdleTimer = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (token) {
+      timeoutRef.current = setTimeout(() => {
+        addLog("Security: Session expired due to inactivity.");
+        handleLogout();
+        setView('dashboard');
+        setIsManageOpen(false);
+      }, INACTIVITY_LIMIT);
+    }
+  };
+
+  useEffect(() => {
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    if (token) {
+      resetIdleTimer();
+      activityEvents.forEach(event => window.addEventListener(event, resetIdleTimer));
+    }
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      activityEvents.forEach(event => window.removeEventListener(event, resetIdleTimer));
+    };
+  }, [token]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
@@ -50,7 +79,7 @@ const App = () => {
 
   const triggerEdit = (service) => {
     setNewService({ name: service.name, tag: service.tag, url: service.url, description: service.description });
-    setEditingId(service._id);
+    setEditingId(service.id); 
   };
 
   const cancelEdit = () => {
@@ -78,7 +107,6 @@ const App = () => {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-400 font-sans p-6 md:p-12 selection:bg-white selection:text-black">
 
-      {/* AUTH MODAL OVERLAY */}
       {showAuthModal && (
         <AuthPanel
           type={setupRequired ? 'setup' : 'login'}
@@ -105,11 +133,15 @@ const App = () => {
         {view === 'dashboard' && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
             <TopBar
-              isManageOpen={isManageOpen} setIsManageOpen={toggleManageServices}
-              syncAllData={syncAllData} searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery} handleSearch={handleSearch}
-              weather={weather} time={time}
-            />
+  isManageOpen={isManageOpen} 
+  setIsManageOpen={toggleManageServices}
+  syncAllData={syncAllData} 
+  weather={weather} 
+  time={time}
+  services={services}
+  currentUser={currentUser}
+  addLog={addLog}
+/>
 
             {isManageOpen && (
               <ServiceManager
@@ -119,21 +151,15 @@ const App = () => {
               />
             )}
 
-            {/* items-start here prevents the whole grid from stretching to the sidebar's height */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
               <ServiceGrid services={services} />
-              <Sidebar logs={logs} wiki={wiki} stats={stats} rss={rss} />
+              <Sidebar logs={logs} stats={stats} services={services} currentUser={currentUser} />
             </div>
           </div>
         )}
 
-        {view === 'docs' && (
-          <DocumentationPanel />
-        )}
-
-        {view === 'settings' && (
-          <SettingsPanel token={token} addLog={addLog} />
-        )}
+        {view === 'docs' && <DocumentationPanel />}
+        {view === 'settings' && <SettingsPanel token={token} addLog={addLog} />}
 
         <footer className="mt-24 border-t border-[#262626] pt-10 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.3em] text-gray-700 font-bold gap-4">
           <div className="flex gap-8"><span>© 2026 Gnosys Labs Gateway</span><span className="hidden md:inline">//</span><span>Plant City NOC</span></div>

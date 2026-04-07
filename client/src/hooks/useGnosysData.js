@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API_BASE = "https://home.gnosys.labs/api";
 
@@ -6,10 +6,11 @@ export function useGnosysData() {
   const [time, setTime] = useState(new Date());
   const [services, setServices] = useState([]);
   const [stats, setStats] = useState({ cpu: 0, mem: 0, disk: 0, uptime: 0 });
-  const [wiki, setWiki] = useState(null);
-  const [rss, setRss] = useState([]);
   const [weather, setWeather] = useState(null);
   const [logs, setLogs] = useState([]);
+  
+  // Track previous service states to detect transitions (e.g., OPERATIONAL -> OFFLINE)
+  const prevServices = useRef([]);
 
   // --- AUTH STATE ---
   const [token, setToken] = useState(localStorage.getItem('gateway_token') || '');
@@ -20,6 +21,22 @@ export function useGnosysData() {
     const timestamp = new Date().toLocaleTimeString([], { hour12: false });
     setLogs(prev => [...prev.slice(-15), `[${timestamp}] ${msg}`]);
   }, []);
+
+  // --- BROWSER NOTIFICATIONS ---
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const sendNotification = (title, body) => {
+    if (Notification.permission === "granted") {
+      new Notification(`GNOSYS GATEWAY: ${title}`, { 
+        body, 
+        icon: "/favicon.svg" 
+      });
+    }
+  };
 
   // --- AUTH FUNCTIONS ---
   const checkAuthStatus = async () => {
@@ -54,17 +71,27 @@ export function useGnosysData() {
   };
 
   const handleSetup = async (username, password) => {
-    const res = await fetch(`${API_BASE}/auth/setup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    if (res.ok) {
-      alert("Master Authority Established. Please log in.");
-      setSetupRequired(false);
-      return true;
-    } else {
-      alert((await res.json()).error || "Setup Failed");
+    try {
+      const res = await fetch(`${API_BASE}/auth/setup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(e) { data = { detail: "Server Error: Non-JSON Response" }; }
+
+      if (res.ok) {
+        alert("Master Authority Established. Please log in.");
+        setSetupRequired(false);
+        return true;
+      } else {
+        alert(data.detail || "Setup Failed");
+        return false;
+      }
+    } catch (err) {
+      alert("Network Error during setup");
       return false;
     }
   };
@@ -82,23 +109,33 @@ export function useGnosysData() {
     try {
       const res = await fetch(`${API_BASE}/services`);
       const data = await res.json();
+      
+      // Compare current status with previous status for reactive pulses and alerts
+      data.forEach(service => {
+        const previous = prevServices.current.find(p => p.id === service.id);
+        
+        if (previous) {
+          // Trigger Alert on Critical Failure
+          if (previous.status !== 'OFFLINE' && service.status === 'OFFLINE') {
+            addLog(`CRITICAL: Asset ${service.name.toUpperCase()} is OFFLINE`);
+            sendNotification("ASSET_CRITICAL", `${service.name} has dropped from the network.`);
+          }
+        }
+      });
+      
+      prevServices.current = data;
       setServices(data);
-    } catch (err) { addLog("Error: DB link severed."); }
+    } catch (err) { 
+      addLog("Error: DB link severed."); 
+    }
   };
 
   const fetchStats = async () => {
     try {
       const res = await fetch(`${API_BASE}/stats`);
-      setStats(await res.json());
-    } catch (err) { console.error("Telemetry offline"); }
-  };
-
-  const fetchWiki = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/wiki`);
       const data = await res.json();
-      if (res.ok) setWiki(data);
-    } catch (e) { addLog("Wiki link failed."); }
+      setStats(data);
+    } catch (err) { console.error("Telemetry offline"); }
   };
 
   const fetchWeather = async () => {
@@ -109,18 +146,9 @@ export function useGnosysData() {
     } catch (e) { addLog("Weather Telemetry: Sensor failure."); }
   };
 
-  const fetchRSS = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/rss`);
-      setRss(await res.json());
-    } catch (err) { addLog("RSS Relay: Connection timeout."); }
-  };
-
   const syncAllData = () => {
     fetchServices();
     fetchStats();
-    fetchWiki();
-    fetchRSS();
     fetchWeather();
     checkAuthStatus();
   };
@@ -132,7 +160,7 @@ export function useGnosysData() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // JWT injected here
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify(serviceData)
       });
@@ -140,14 +168,8 @@ export function useGnosysData() {
         addLog(`Asset Created: ${serviceData.name.toUpperCase()}`);
         fetchServices();
         return true; 
-      } else {
-        if (res.status === 401 || res.status === 403) handleLogout();
-        addLog("Write Error: Access Denied.");
       }
-    } catch (err) { 
-      addLog("Write Error: Transaction failed."); 
-      return false;
-    }
+    } catch (err) { addLog("Write Error: Transaction failed."); return false; }
   };
 
   const updateService = async (id, serviceData) => {
@@ -164,28 +186,19 @@ export function useGnosysData() {
         addLog(`Asset Updated: ${serviceData.name.toUpperCase()}`);
         fetchServices();
         return true; 
-      } else {
-        if (res.status === 401 || res.status === 403) handleLogout();
-        addLog("Write Error: Access Denied.");
       }
-    } catch (err) { 
-      addLog("Write Error: Transaction failed."); 
-      return false;
-    }
+    } catch (err) { addLog("Write Error: Transaction failed."); return false; }
   };
 
   const removeService = async (id, name) => {
     try {
       const res = await fetch(`${API_BASE}/services/${id}`, { 
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` } // JWT injected here
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         addLog(`Asset Purged: ${name.toUpperCase()}`);
         fetchServices();
-      } else {
-        if (res.status === 401 || res.status === 403) handleLogout();
-        addLog("Delete Error: Access Denied.");
       }
     } catch (err) { addLog("Delete Error: Transaction failed."); }
   };
@@ -195,19 +208,17 @@ export function useGnosysData() {
     const timer = setInterval(() => setTime(new Date()), 1000);
     syncAllData();
     const statsInterval = setInterval(fetchStats, 5000); 
-    const rssInterval = setInterval(fetchRSS, 600000); 
     const servicesInterval = setInterval(fetchServices, 15000);
     
     return () => {
       clearInterval(timer);
       clearInterval(statsInterval);
-      clearInterval(rssInterval);
       clearInterval(servicesInterval);
     };
   }, []);
 
   return {
-    time, services, stats, wiki, rss, weather, logs,
+    time, services, stats, weather, logs,
     token, currentUser, setupRequired,
     handleLogin, handleSetup, handleLogout,
     addLog, syncAllData, submitNewService, removeService, updateService

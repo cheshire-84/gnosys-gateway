@@ -85,7 +85,7 @@ export default function NetworkGraph({ services, currentUser }) {
 
   return (
     <div className="p-4 bg-black border border-[#222] mt-8 overflow-hidden">
-      <h2 className="text-[9px] font-bold text-gray-700 uppercase tracking-widest mb-4 border-b border-[#1a1a1a] pb-2">
+      <h2 className="text-[10px] font-bold text-gray-700 uppercase tracking-widest mb-4 border-b border-[#1a1a1a] pb-2">
         Neural_Network_Topology
       </h2>
       <svg ref={svgRef} width="100%" height="250" viewBox="0 0 300 250"></svg>

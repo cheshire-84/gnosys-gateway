@@ -11,7 +11,7 @@ export default function Sidebar({ logs, stats, services, currentUser }) {
   return (
     <aside className="lg:col-span-3 space-y-8">
       {/* SYSTEM LOG BOX */}
-      <div className="p-5 bg-black border border-[#222] font-mono text-[9px] h-64 flex flex-col">
+      <div className="p-5 bg-black border border-[#222] font-mono text-[10px] h-64 flex flex-col">
         <h2 className="text-gray-700 border-b border-[#1a1a1a] pb-2 mb-2 uppercase tracking-widest">System_Event_Log</h2>
         <div className="flex-1 overflow-y-auto scrollbar-hide space-y-1">
           {logs.map((log, i) => (
@@ -25,8 +25,8 @@ export default function Sidebar({ logs, stats, services, currentUser }) {
 
       {/* TELEMETRY */}
       <div className="p-6 border border-[#262626] bg-[#0a0a0a]">
-        <h2 className="text-[9px] font-bold text-white uppercase tracking-widest mb-6 border-b border-[#1a1a1a] pb-2">Local_Telemetry</h2>
-        <div className="space-y-5 font-mono text-[9px]">
+        <h2 className="text-[10px] font-bold text-white uppercase tracking-widest mb-6 border-b border-[#1a1a1a] pb-2">Local_Telemetry</h2>
+        <div className="space-y-5 font-mono text-[10px]">
           {[
             { label: 'CPU', val: `${stats.cpu}%` },
             { label: 'MEM', val: `${stats.mem}%` },

@@ -66,9 +66,7 @@ def verify_password(password: str, stored_val: str):
     except: return False
 
 # --- BACKGROUND MONITORING ---
-# --- UPDATED BACKGROUND MONITORING ---
 def run_monitor():
-    """Background thread to ping services with SSL bypass and Browser Headers."""
     while True:
         try:
             conn = get_db_conn()
@@ -76,23 +74,18 @@ def run_monitor():
             cursor.execute("SELECT id, url, ping_history, name FROM services")
             services = cursor.fetchall()
             
-            # Use a single client for efficiency
             with httpx.Client(verify=False, timeout=5.0) as client:
                 for s_id, url, history_json, name in services:
                     history = json.loads(history_json) if history_json else [0]*10
                     start = time.time()
                     try:
-                        # Adding User-Agent to prevent 403 blocks
                         headers = {'User-Agent': 'GnosysGateway/2.5 (Terminal Monitoring)'}
                         response = client.get(url, headers=headers)
-                        
                         latency = int((time.time() - start) * 1000)
-                        # Any status under 400 is considered "OPERATIONAL"
                         new_status = "OPERATIONAL" if response.status_code < 400 else "DEGRADED"
                     except Exception as e:
                         latency = 0
                         new_status = "OFFLINE"
-                        # Log the specific error to gateway.log for debugging
                         logging.warning(f"Monitor Failure for {name}: {str(e)}")
                     
                     history.pop(0)
@@ -107,9 +100,8 @@ def run_monitor():
         except Exception as e:
             logging.error(f"Monitor Loop Error: {str(e)}")
         
-        time.sleep(30) # Pulse every 30 seconds
+        time.sleep(30)
 
-# Start the thread as before
 monitor_thread = threading.Thread(target=run_monitor, daemon=True)
 monitor_thread.start()
 
@@ -126,52 +118,24 @@ async def auth_setup(req: AuthRequest, db: sqlite3.Connection = Depends(get_db))
         raise HTTPException(status_code=400, detail="Setup already completed")
     db.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (req.username, hash_password(req.password)))
     db.commit()
-    logging.info(f"System: Root authority established for {req.username}")
     return {"message": "Root authority established"}
 
 @app.post("/api/auth/login")
 async def auth_login(req: AuthRequest, db: sqlite3.Connection = Depends(get_db)):
     user = db.execute("SELECT * FROM users WHERE username = ?", (req.username,)).fetchone()
     if not user or not verify_password(req.password, user["password_hash"]):
-        logging.warning(f"Security: Failed login attempt for {req.username}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = jwt.encode({
         "sub": user["username"],
         "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
     }, SECRET_KEY, algorithm=ALGORITHM)
-    logging.info(f"Security: {req.username} authenticated")
     return {"token": token, "username": user["username"]}
 
-# NEW: Fetch all administrators for SettingsPanel
 @app.get("/api/auth/users")
 async def get_users(db: sqlite3.Connection = Depends(get_db)):
     rows = db.execute("SELECT id, username FROM users").fetchall()
     return [dict(row) for row in rows]
-
-# NEW: Provision a new administrator
-@app.post("/api/auth/users")
-async def create_user(req: AuthRequest, db: sqlite3.Connection = Depends(get_db)):
-    try:
-        db.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (req.username, hash_password(req.password)))
-        db.commit()
-        logging.info(f"Security: New admin provisioned - {req.username}")
-        return {"status": "success"}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Identifier already exists")
-
-# NEW: Revoke administrator access
-@app.delete("/api/auth/users/{user_id}")
-async def delete_user(user_id: int, db: sqlite3.Connection = Depends(get_db)):
-    # Prevent deleting the last admin to avoid lock-out
-    count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if count <= 1:
-        raise HTTPException(status_code=400, detail="Cannot revoke final root authority")
-    
-    db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    db.commit()
-    logging.info(f"Security: Access revoked for User ID {user_id}")
-    return {"status": "revoked"}
 
 # --- SERVICE REGISTRY ENDPOINTS ---
 
@@ -181,6 +145,7 @@ async def get_services(db: sqlite3.Connection = Depends(get_db)):
     services = []
     for row in rows:
         s = dict(row)
+        s['id'] = row['id']
         s['pingHistory'] = json.loads(s['ping_history']) if s.get('ping_history') else [0]*10
         services.append(s)
     return services
@@ -192,15 +157,24 @@ async def add_service(service: ServiceCreate, db: sqlite3.Connection = Depends(g
         (service.name, service.tag, service.url, service.description, json.dumps([0]*10))
     )
     db.commit()
-    logging.info(f"Asset Created: {service.name}")
     return {"status": "success"}
+
+@app.put("/api/services/{service_id}")
+async def update_service(service_id: int, service: ServiceCreate, db: sqlite3.Connection = Depends(get_db)):
+    db.execute(
+        "UPDATE services SET name=?, tag=?, url=?, description=? WHERE id=?",
+        (service.name, service.tag, service.url, service.description, service_id)
+    )
+    db.commit()
+    return {"status": "updated"}
 
 @app.delete("/api/services/{service_id}")
 async def delete_service(service_id: int, db: sqlite3.Connection = Depends(get_db)):
     db.execute("DELETE FROM services WHERE id = ?", (service_id,))
     db.commit()
-    logging.info(f"Asset Purged: ID {service_id}")
     return {"status": "purged"}
+
+# --- SYSTEM STATS ---
 
 @app.get("/api/stats")
 async def get_stats():

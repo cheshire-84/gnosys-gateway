@@ -66,7 +66,7 @@ export default function SettingsPanel({ token, addLog }) {
         <h2 className="text-[10px] font-bold tracking-widest uppercase text-gray-500 mb-6 border-b border-stoic-border pb-4">System Security // Access Control</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <div>
-            <h3 className="text-[9px] uppercase tracking-widest text-gray-600 mb-4">Active Administrators</h3>
+            <h3 className="text-[10px] uppercase tracking-widest text-gray-600 mb-4">Active Administrators</h3>
             <ul className="space-y-4">
               {users.map(u => (
                 <li key={u._id} className="flex justify-between items-center bg-black border border-stoic-border p-4">
@@ -77,7 +77,7 @@ export default function SettingsPanel({ token, addLog }) {
             </ul>
           </div>
           <div>
-            <h3 className="text-[9px] uppercase tracking-widest text-gray-600 mb-4">Provision New Admin</h3>
+            <h3 className="text-[10px] uppercase tracking-widest text-gray-600 mb-4">Provision New Admin</h3>
             <form onSubmit={handleAddUser} className="space-y-4">
               <input className="w-full bg-black border border-stoic-border p-4 text-xs text-white focus:border-white outline-none font-mono placeholder:text-gray-800 transition-colors" placeholder="NEW IDENTIFIER" value={newUsername} onChange={e => setNewUsername(e.target.value)} required />
               <input type="password" autoComplete="new-password" className="w-full bg-black border border-stoic-border p-4 text-xs text-white focus:border-white outline-none font-mono placeholder:text-gray-800 transition-colors" placeholder="NEW PASSPHRASE" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />

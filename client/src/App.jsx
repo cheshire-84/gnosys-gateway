@@ -78,7 +78,13 @@ const App = () => {
   };
 
   const triggerEdit = (service) => {
-    setNewService({ name: service.name, tag: service.tag, url: service.url, description: service.description });
+    setNewService({ 
+      name: service.name, 
+      tag: service.tag, 
+      url: service.url, 
+      description: service.description 
+    });
+    // Use .id specifically for the SQLite backend
     setEditingId(service.id); 
   };
 
@@ -161,7 +167,7 @@ const App = () => {
         {view === 'docs' && <DocumentationPanel />}
         {view === 'settings' && <SettingsPanel token={token} addLog={addLog} />}
 
-        <footer className="mt-24 border-t border-[#262626] pt-10 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.3em] text-gray-700 font-bold gap-4">
+        <footer className="mt-24 border-t border-[#262626] pt-10 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.3em] text-gray-700 font-bold gap-4">
           <div className="flex gap-8"><span>© 2026 Gnosys Labs Gateway</span><span className="hidden md:inline">//</span><span>Plant City NOC</span></div>
           <div className="flex gap-6 items-center">
             <div className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-green-900 shadow-[0_0_5px_rgba(5,150,105,0.5)]"></span><span>Uptime_Stable</span></div>

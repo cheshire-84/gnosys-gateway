@@ -173,6 +173,7 @@ export function useGnosysData() {
   };
 
   const updateService = async (id, serviceData) => {
+    if (!id) { console.error("Update failed: ID is undefined"); return false; }
     try {
       const res = await fetch(`${API_BASE}/services/${id}`, {
         method: 'PUT',
@@ -191,6 +192,11 @@ export function useGnosysData() {
   };
 
   const removeService = async (id, name) => {
+    // Logging the ID to console helps verify the fix
+    if (!id) { 
+      console.error("Delete failed: ID is missing for", name); 
+      return; 
+    }
     try {
       const res = await fetch(`${API_BASE}/services/${id}`, { 
         method: 'DELETE',
@@ -199,8 +205,12 @@ export function useGnosysData() {
       if (res.ok) {
         addLog(`Asset Purged: ${name.toUpperCase()}`);
         fetchServices();
+      } else {
+        addLog("Delete Error: Server rejected request.");
       }
-    } catch (err) { addLog("Delete Error: Transaction failed."); }
+    } catch (err) { 
+      addLog("Delete Error: Transaction failed."); 
+    }
   };
 
   useEffect(() => {

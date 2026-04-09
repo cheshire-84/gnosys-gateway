@@ -54,7 +54,7 @@ export default function ServiceGrid({ services }) {
             <div>
               <div className="absolute top-0 right-0 p-4">
                 <div className="flex items-center gap-2">
-                  <span className={`text-[9px] uppercase tracking-widest font-bold ${textColor}`}>
+                  <span className={`text-[10px] uppercase tracking-widest font-bold ${textColor}`}>
                     {service.status || 'UNKNOWN'}
                   </span>
                   <span className={`w-2 h-2 rounded-full ${dotColor} ${shadow} ${pulse}`}></span>
